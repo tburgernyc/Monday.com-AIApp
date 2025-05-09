@@ -1,0 +1,132 @@
+{
+  "name": "claude-ai-assistant",
+  "version": "1.0.0",
+  "description": "Natural language workflow automation for Monday.com using Claude API",
+  "main": "server.js",
+  "engine": "node16",
+  "routes": [
+    {
+      "path": "/",
+      "method": "GET",
+      "handler": "server.js"
+    },
+    {
+      "path": "/api/process-request",
+      "method": "POST",
+      "handler": "server.js"
+    },
+    {
+      "path": "/api/webhooks/subscription",
+      "method": "POST",
+      "handler": "monetization-routes.js"
+    },
+    {
+      "path": "/api/subscription/:accountId",
+      "method": "GET",
+      "handler": "monetization-routes.js"
+    },
+    {
+      "path": "/api/subscription/:accountId/increment",
+      "method": "POST",
+      "handler": "monetization-routes.js"
+    },
+    {
+      "path": "/api/subscription/:accountId/feature/:feature",
+      "method": "GET",
+      "handler": "monetization-routes.js"
+    },
+    {
+      "path": "/oauth/auth",
+      "method": "GET",
+      "handler": "oauth-routes.js"
+    },
+    {
+      "path": "/oauth/callback",
+      "method": "GET",
+      "handler": "oauth-routes.js"
+    },
+    {
+      "path": "/oauth/success",
+      "method": "GET",
+      "handler": "oauth-routes.js"
+    },
+    {
+      "path": "/oauth/status/:accountId",
+      "method": "GET",
+      "handler": "oauth-routes.js"
+    },
+    {
+      "path": "/oauth/revoke/:accountId",
+      "method": "POST",
+      "handler": "oauth-routes.js"
+    },
+    {
+      "path": "/health",
+      "method": "GET",
+      "handler": "server.js"
+    },
+    {
+      "path": "/webhook/challenge",
+      "method": "POST",
+      "handler": "server.js"
+    }
+  ],
+  "webpackEntries": {
+    "board-view": "./client/src/index.js",
+    "ai-assistant": "./client/src/index.js"
+  },
+  "regions": [
+    {
+      "name": "US",
+      "default": true
+    },
+    {
+      "name": "EU"
+    }
+  ],
+  "environmentVariables": [
+    {
+      "name": "MONDAY_API_TOKEN",
+      "required": true
+    },
+    {
+      "name": "MONDAY_CLIENT_ID",
+      "required": true
+    },
+    {
+      "name": "MONDAY_CLIENT_SECRET",
+      "required": true
+    },
+    {
+      "name": "MONDAY_SIGNING_SECRET",
+      "required": true
+    },
+    {
+      "name": "CLAUDE_API_KEY",
+      "required": true
+    },
+    {
+      "name": "OAUTH_REDIRECT_URI",
+      "required": true
+    },
+    {
+      "name": "NODE_ENV",
+      "required": false,
+      "defaultValue": "production"
+    },
+    {
+      "name": "REGION",
+      "required": false,
+      "defaultValue": "US"
+    }
+  ],
+  "resources": {
+    "memory": "256Mi",
+    "cpu": "100m",
+    "timeout": 60
+  },
+  "scaling": {
+    "minInstances": 1,
+    "maxInstances": 10
+  }
+}

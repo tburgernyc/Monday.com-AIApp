@@ -1,0 +1,47 @@
+{
+  "app_id": "monday-claude-integration",
+  "title": "Claude AI Assistant",
+  "description": "Use natural language to manage your monday.com boards, items, and workflows",
+  "icon_url": "https://example.com/claude-icon.png",
+  "version": "1.0.0",
+  "organization": {
+    "name": "Your Organization",
+    "url": "https://your-org-website.com"
+  },
+  "permissions": {
+    "boards": {
+      "actions": ["read", "write", "create", "delete"]
+    },
+    "items": {
+      "actions": ["read", "write", "create", "delete"]
+    },
+    "columns": {
+      "actions": ["read", "write", "create"]
+    },
+    "groups": {
+      "actions": ["read", "write", "create"]
+    },
+    "account": {
+      "actions": ["read"]
+    },
+    "teams": {
+      "actions": ["read"]
+    },
+    "users": {
+      "actions": ["read"]
+    }
+  },
+  "features": [
+    {
+      "type": "board_view",
+      "name": "Claude AI Assistant",
+      "url": "https://your-app-url.com/board-view"
+    },
+    {
+      "type": "ai_assistant",
+      "board_location": "header",
+      "name": "Claude AI Assistant",
+      "url": "https://your-app-url.com/ai-assistant"
+    }
+  ]
+}

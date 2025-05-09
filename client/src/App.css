@@ -1,0 +1,124 @@
+/* client/src/App.css */
+.App {
+  font-family: 'Roboto', sans-serif;
+  padding: 24px;
+  background-color: #f6f7fb;
+  border-radius: 8px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+header {
+  margin-bottom: 24px;
+}
+
+header h1 {
+  color: #0073ea;
+  font-size: 24px;
+  margin: 0 0 8px 0;
+}
+
+header p {
+  color: #676879;
+  margin: 0;
+  font-size: 14px;
+}
+
+form {
+  margin-bottom: 24px;
+}
+
+textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #dcdfe4;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: 'Roboto', sans-serif;
+  resize: vertical;
+  min-height: 120px;
+  margin-bottom: 12px;
+}
+
+textarea:focus {
+  outline: none;
+  border-color: #0073ea;
+  box-shadow: 0 0 0 2px rgba(0, 115, 234, 0.2);
+}
+
+button {
+  background-color: #0073ea;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+button:hover {
+  background-color: #0060b9;
+}
+
+button:disabled {
+  background-color: #cfd3db;
+  cursor: not-allowed;
+}
+
+.error {
+  background-color: #ffd6d6;
+  color: #d83a52;
+  padding: 12px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+.response {
+  background-color: white;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.response h2 {
+  color: #323338;
+  font-size: 18px;
+  margin: 0 0 16px 0;
+}
+
+.explanation h3,
+.result h3 {
+  color: #323338;
+  font-size: 16px;
+  margin: 0 0 8px 0;
+}
+
+.explanation p {
+  color: #323338;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0 0 16px 0;
+}
+
+.result pre {
+  background-color: #f6f7fb;
+  border-radius: 4px;
+  padding: 16px;
+  color: #323338;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-x: auto;
+}
+
+@media (max-width: 600px) {
+  .App {
+    padding: 16px;
+  }
+  
+  button {
+    width: 100%;
+  }
+}

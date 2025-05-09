@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./:/app
+      - /app/node_modules
+      - /app/client/node_modules
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - MONDAY_API_TOKEN=${MONDAY_API_TOKEN}
+      - MONDAY_CLIENT_ID=${MONDAY_CLIENT_ID}
+      - MONDAY_CLIENT_SECRET=${MONDAY_CLIENT_SECRET}
+      - MONDAY_SIGNING_SECRET=${MONDAY_SIGNING_SECRET}
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY}
+      - OAUTH_REDIRECT_URI=${OAUTH_REDIRECT_URI}
+      - REGION=${REGION:-US}
+    env_file:
+      - .env
+    command: npm run dev-concurrent
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    depends_on:
+      - app
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    depends_on:
+      - prometheus
+
+volumes:
+  redis-data:
+  prometheus-data:
+  grafana-data:
