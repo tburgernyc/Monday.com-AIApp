@@ -1,0 +1,188 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: npm audit --audit-level=high
+
+      - name: Run SAST scan with CodeQL
+        uses: github/codeql-action/analyze@v2
+        with:
+          languages: javascript
+
+      - name: Check for secrets in code
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: security-scan
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create .env file for testing
+        run: |
+          echo "MONDAY_CLIENT_ID=${{ secrets.MONDAY_CLIENT_ID_TEST }}" >> .env
+          echo "MONDAY_CLIENT_SECRET=${{ secrets.MONDAY_CLIENT_SECRET_TEST }}" >> .env
+          echo "MONDAY_API_TOKEN=${{ secrets.MONDAY_API_TOKEN_TEST }}" >> .env
+          echo "CLAUDE_API_KEY=${{ secrets.CLAUDE_API_KEY_TEST }}" >> .env
+          echo "REGION=US" >> .env
+          echo "PORT=3001" >> .env
+
+      - name: Run tests
+        run: npm test
+
+      - name: Upload test coverage
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage
+          path: coverage/
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build
+          path: client/build/
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+    environment: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: build
+          path: client/build/
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create .env file
+        run: |
+          echo "MONDAY_CLIENT_ID=${{ secrets.MONDAY_CLIENT_ID_STAGING }}" >> .env
+          echo "MONDAY_CLIENT_SECRET=${{ secrets.MONDAY_CLIENT_SECRET_STAGING }}" >> .env
+          echo "MONDAY_API_TOKEN=${{ secrets.MONDAY_API_TOKEN_STAGING }}" >> .env
+          echo "CLAUDE_API_KEY=${{ secrets.CLAUDE_API_KEY_STAGING }}" >> .env
+          echo "REGION=${{ secrets.REGION_STAGING }}" >> .env
+          echo "PORT=3001" >> .env
+          echo "REDIS_URL=${{ secrets.REDIS_URL_STAGING }}" >> .env
+
+      - name: Deploy to staging
+        run: |
+          # Add your deployment script here
+          echo "Deploying to staging environment"
+          # Example: npm run deploy:staging
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production'
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: build
+          path: client/build/
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create .env file
+        run: |
+          echo "MONDAY_CLIENT_ID=${{ secrets.MONDAY_CLIENT_ID_PROD }}" >> .env
+          echo "MONDAY_CLIENT_SECRET=${{ secrets.MONDAY_CLIENT_SECRET_PROD }}" >> .env
+          echo "MONDAY_API_TOKEN=${{ secrets.MONDAY_API_TOKEN_PROD }}" >> .env
+          echo "CLAUDE_API_KEY=${{ secrets.CLAUDE_API_KEY_PROD }}" >> .env
+          echo "REGION=${{ secrets.REGION_PROD }}" >> .env
+          echo "PORT=3001" >> .env
+          echo "REDIS_URL=${{ secrets.REDIS_URL_PROD }}" >> .env
+
+      - name: Deploy to production
+        run: |
+          # Add your deployment script here
+          echo "Deploying to production environment"
+          # Example: npm run deploy:production

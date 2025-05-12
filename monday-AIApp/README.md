@@ -133,11 +133,35 @@ Before submitting to the Monday.com marketplace:
 
 ## Security Considerations
 
-- API keys and secrets are stored in environment variables
-- OAuth flow is used for secure authentication
-- Rate limiting is implemented to prevent abuse
-- Input validation is performed on all endpoints
+### API Key Security
+- **NEVER commit API keys or secrets to version control**
+- Store all credentials in environment variables
+- Use `.env.example` with placeholders to document required variables
+- Rotate any credentials that may have been exposed
+
+### Authentication and Authorization
+- OAuth flow is used for secure authentication with Monday.com
+- Session tokens are validated on all protected endpoints
+- Permission checks are performed for sensitive operations
 - HTTPS is required for all communications
+
+### Rate Limiting and Protection
+- Rate limiting is implemented to prevent abuse
+- Exponential backoff with jitter for API retries
+- Request queuing for high-traffic scenarios
+- Input validation and sanitization on all endpoints
+
+### Monitoring and Logging
+- Structured logging with appropriate log levels
+- Performance metrics collection via Prometheus
+- Real-time monitoring for security events
+- Sensitive data is redacted from logs
+
+### Deployment Security
+- Use GitHub Secrets for CI/CD credentials
+- Separate environments for development, staging, and production
+- Security scanning in the CI pipeline
+- Regular dependency updates and vulnerability scanning
 
 ## License
 

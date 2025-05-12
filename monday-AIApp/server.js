@@ -59,6 +59,9 @@ const scopeValidator = require('./monday-claude-utils/scopeValidator');
 // Import middleware
 const { errorHandler } = require('./middleware/errorMiddleware');
 const { requireAuthentication } = require('./middleware/authMiddleware');
+const { cacheMiddleware } = require('./middleware/cacheMiddleware');
+const redisCache = require('./monday-claude-utils/redis-cache');
+const { metricsMiddleware, getMetrics } = require('./monitoring/metrics');
 
 const app = express();
 
@@ -88,6 +91,9 @@ app.use(compression({
 // Security middleware
 app.use(helmet());
 app.use(bodyParser.json());
+
+// Apply metrics middleware
+app.use(metricsMiddleware);
 
 // Configure rate limiting
 const apiLimiter = rateLimit({
@@ -475,7 +481,10 @@ app.post('/api/test-automation', [
 /**
  * Get workflow templates endpoint
  */
-app.get('/api/workflow-templates', (req, res) => {
+app.get('/api/workflow-templates', cacheMiddleware({
+  prefix: 'workflow-templates',
+  ttl: 3600 // Cache for 1 hour
+}), (req, res) => {
   try {
     const workflowTemplates = require('./monday-claude-utils/workflowTemplates');
     const templates = workflowTemplates.getAvailableTemplateNames();
@@ -492,7 +501,10 @@ app.get('/api/workflow-templates', (req, res) => {
 /**
  * Get specific workflow template
  */
-app.get('/api/workflow-templates/:templateName', (req, res) => {
+app.get('/api/workflow-templates/:templateName', cacheMiddleware({
+  prefix: 'workflow-template',
+  ttl: 3600 // Cache for 1 hour
+}), (req, res) => {
   try {
     const { templateName } = req.params;
     const workflowTemplates = require('./monday-claude-utils/workflowTemplates');
@@ -514,7 +526,10 @@ app.get('/api/workflow-templates/:templateName', (req, res) => {
 /**
  * Get conversation history for a user
  */
-app.get('/api/conversation-history/:userId', requireAuthentication, async (req, res, next) => {
+app.get('/api/conversation-history/:userId', requireAuthentication, cacheMiddleware({
+  prefix: 'conversation-history',
+  ttl: 60 // Cache for 1 minute (short TTL since this data changes frequently)
+}), async (req, res, next) => {
   try {
     const { userId } = req.params;
 
@@ -539,6 +554,10 @@ app.delete('/api/conversation-history/:userId', requireAuthentication, async (re
     const historyKey = `conversation_history_${userId}`;
     await storage.set(historyKey, []);
 
+    // Invalidate cache for this user's conversation history
+    const { invalidateCache } = require('./middleware/cacheMiddleware');
+    await invalidateCache(`conversation-history:${userId}`);
+
     return res.json({ success: true });
   } catch (error) {
     // Pass error to the error handling middleware
@@ -552,6 +571,20 @@ app.use(express.static('client/build', {
   etag: true, // Enable ETag header
   lastModified: true // Enable Last-Modified header
 }));
+
+/**
+ * Metrics endpoint for Prometheus
+ */
+app.get('/metrics', async (req, res) => {
+  try {
+    const metrics = await getMetrics();
+    res.set('Content-Type', 'text/plain');
+    res.send(metrics);
+  } catch (error) {
+    logger.error('Error generating metrics', { error });
+    res.status(500).send('Error generating metrics');
+  }
+});
 
 // Apply error handling middleware - must be after all routes
 app.use(errorHandler);
