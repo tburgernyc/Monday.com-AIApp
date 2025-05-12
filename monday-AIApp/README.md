@@ -163,6 +163,15 @@ Before submitting to the Monday.com marketplace:
 - Security scanning in the CI pipeline
 - Regular dependency updates and vulnerability scanning
 
+## Additional Documentation
+
+For detailed setup guides, please refer to the following resources:
+
+1. **GitHub Secrets Setup** - How to securely store credentials for CI/CD pipelines
+2. **Prometheus Monitoring** - How to configure Prometheus to monitor your application
+3. **Redis for Production** - How to set up Redis for distributed caching
+4. **Troubleshooting Guide** - Solutions for common issues
+
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
