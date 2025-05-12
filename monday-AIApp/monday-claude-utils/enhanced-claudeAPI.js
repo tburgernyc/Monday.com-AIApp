@@ -6,6 +6,7 @@
 const axios = require('axios');
 const { Logger } = require('@mondaycom/apps-sdk');
 const config = require('../config');
+const requestQueue = require('./requestQueue');
 
 const logger = new Logger('claude-api-utils');
 
@@ -137,6 +138,24 @@ function recordFailure(error) {
 }
 
 /**
+ * Calculate exponential backoff delay with full jitter
+ *
+ * @param {number} retryAttempt - The current retry attempt (0-based)
+ * @param {number} baseDelay - Base delay in milliseconds (default: 1000)
+ * @param {number} maxDelay - Maximum delay in milliseconds (default: 60000)
+ * @returns {number} - The delay in milliseconds
+ */
+function calculateBackoff(retryAttempt, baseDelay = 1000, maxDelay = 60000) {
+  // Exponential backoff with full jitter
+  // Formula: random_between(0, min(cap, base * 2 ^ attempt))
+  const exponentialDelay = Math.min(maxDelay, baseDelay * Math.pow(2, retryAttempt));
+
+  // Add jitter by selecting a random delay between 0 and the calculated delay
+  // This helps prevent "thundering herd" problems when multiple clients retry simultaneously
+  return Math.floor(Math.random() * exponentialDelay);
+}
+
+/**
  * Check if we're within rate limits and wait if necessary
  *
  * @returns {Promise<void>} - Resolves when it's safe to make a request
@@ -260,16 +279,26 @@ async function sendMessage(message, options = {}, retries = 0) {
       requestBody.tool_choice = toolChoice;
     }
 
-    const response = await axios.post(
-      CLAUDE_API_URL,
-      requestBody,
+    // Use the request queue to manage API calls
+    const response = await requestQueue.enqueueRequest(
+      async () => {
+        return axios.post(
+          CLAUDE_API_URL,
+          requestBody,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': apiKey,
+              'anthropic-version': CLAUDE_API_VERSION
+            },
+            timeout: timeout // Set request timeout
+          }
+        );
+      },
       {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': CLAUDE_API_VERSION
-        },
-        timeout: timeout // Set request timeout
+        id: `claude-request-${Date.now()}`,
+        timeout: timeout + 5000, // Add 5 seconds to the timeout for queue processing
+        priority: retries > 0 ? 0 : 1 // Prioritize retry attempts
       }
     );
 
@@ -311,8 +340,8 @@ async function sendMessage(message, options = {}, retries = 0) {
       ].includes(errorType);
 
       if (isRetryable) {
-        // Calculate exponential backoff delay
-        const delay = Math.pow(2, retries) * 1000 + Math.random() * 1000;
+        // Calculate exponential backoff delay with jitter
+        const delay = calculateBackoff(retries);
 
         logger.warn('Retryable error from Claude API, will retry', {
           errorType,

@@ -59,14 +59,44 @@ function validateWebhookSignature(req) {
       .update(payload)
       .digest('hex');
 
-    // Compare signatures using a timing-safe comparison
-    const isValid = crypto.timingSafeEqual(
-      Buffer.from(signature),
-      Buffer.from(expectedSignature)
-    );
+    // Try timing-safe comparison if lengths match
+    if (signature.length === expectedSignature.length) {
+      try {
+        const isValid = crypto.timingSafeEqual(
+          Buffer.from(signature),
+          Buffer.from(expectedSignature)
+        );
+
+        if (!isValid) {
+          logger.warn('Invalid webhook signature', {
+            expected: expectedSignature.substring(0, 8) + '...',
+            received: signature.substring(0, 8) + '...'
+          });
+        }
+
+        return isValid;
+      } catch (err) {
+        logger.warn('Error in timing-safe comparison', { error: err.message });
+        // Fall through to string comparison
+      }
+    }
+
+    // Fallback to constant-time string comparison (less secure but handles different lengths)
+    let result = 0;
+    const sigA = signature.toLowerCase();
+    const sigB = expectedSignature.toLowerCase();
+
+    // Constant-time string comparison
+    for (let i = 0; i < Math.max(sigA.length, sigB.length); i++) {
+      const charA = i < sigA.length ? sigA.charCodeAt(i) : 0;
+      const charB = i < sigB.length ? sigB.charCodeAt(i) : 0;
+      result |= charA ^ charB;
+    }
+
+    const isValid = result === 0;
 
     if (!isValid) {
-      logger.warn('Invalid webhook signature', {
+      logger.warn('Invalid webhook signature (fallback comparison)', {
         expected: expectedSignature.substring(0, 8) + '...',
         received: signature.substring(0, 8) + '...'
       });

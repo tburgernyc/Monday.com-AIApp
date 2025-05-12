@@ -14,6 +14,38 @@ const { v4: uuidv4 } = require('uuid');
 const { validationResult, body } = require('express-validator');
 const { Storage, Logger } = require('@mondaycom/apps-sdk');
 
+// Initialize monday's SDK components
+const storage = new Storage();
+const logger = new Logger('monday-claude-integration');
+
+/**
+ * Verify all required environment variables are present
+ * This is a critical security check that runs at startup
+ */
+function verifyEnvironmentVariables() {
+  const requiredVars = [
+    'MONDAY_CLIENT_ID',
+    'MONDAY_CLIENT_SECRET',
+    'OAUTH_REDIRECT_URI',
+    'MONDAY_API_TOKEN',
+    'CLAUDE_API_KEY',
+    'REGION'
+  ];
+
+  const missing = requiredVars.filter(varName => !process.env[varName]);
+
+  if (missing.length > 0) {
+    logger.error('ERROR: Missing required environment variables: ' + missing.join(', '));
+    logger.error('Please check your .env file and restart the application.');
+    process.exit(1);
+  }
+
+  logger.info('Environment validation successful - all required variables present');
+}
+
+// Verify environment variables before proceeding
+verifyEnvironmentVariables();
+
 // Import route handlers
 const monetizationRoutes = require('./monetization-routes');
 const oauthRoutes = require('./oauth-routes');
@@ -24,11 +56,11 @@ const mondayAPI = require('./monday-claude-utils/mondayAPI');
 const automationUtils = require('./monday-claude-utils/automationUtils');
 const scopeValidator = require('./monday-claude-utils/scopeValidator');
 
-const app = express();
+// Import middleware
+const { errorHandler } = require('./middleware/errorMiddleware');
+const { requireAuthentication } = require('./middleware/authMiddleware');
 
-// Initialize monday's SDK components
-const storage = new Storage();
-const logger = new Logger('monday-claude-integration');
+const app = express();
 
 // Generate request IDs for tracking
 app.use((req, res, next) => {
@@ -482,44 +514,26 @@ app.get('/api/workflow-templates/:templateName', (req, res) => {
 /**
  * Get conversation history for a user
  */
-app.get('/api/conversation-history/:userId', async (req, res) => {
+app.get('/api/conversation-history/:userId', requireAuthentication, async (req, res, next) => {
   try {
     const { userId } = req.params;
-
-    // Validate session token
-    const sessionToken = req.headers['x-monday-session-token'];
-    if (!sessionToken) {
-      return res.status(401).json({ error: 'Missing session token' });
-    }
 
     // Get conversation history
     const history = await claudeAPI.getConversationHistory(userId);
 
     return res.json(history);
   } catch (error) {
-    logger.error('Error getting conversation history', {
-      error,
-      userId: req.params.userId
-    });
-
-    return res.status(500).json({
-      error: 'Failed to retrieve conversation history'
-    });
+    // Pass error to the error handling middleware
+    next(error);
   }
 });
 
 /**
  * Clear conversation history for a user
  */
-app.delete('/api/conversation-history/:userId', async (req, res) => {
+app.delete('/api/conversation-history/:userId', requireAuthentication, async (req, res, next) => {
   try {
     const { userId } = req.params;
-
-    // Validate session token
-    const sessionToken = req.headers['x-monday-session-token'];
-    if (!sessionToken) {
-      return res.status(401).json({ error: 'Missing session token' });
-    }
 
     // Clear history (set empty array)
     const historyKey = `conversation_history_${userId}`;
@@ -527,14 +541,8 @@ app.delete('/api/conversation-history/:userId', async (req, res) => {
 
     return res.json({ success: true });
   } catch (error) {
-    logger.error('Error clearing conversation history', {
-      error,
-      userId: req.params.userId
-    });
-
-    return res.status(500).json({
-      error: 'Failed to clear conversation history'
-    });
+    // Pass error to the error handling middleware
+    next(error);
   }
 });
 
@@ -544,6 +552,9 @@ app.use(express.static('client/build', {
   etag: true, // Enable ETag header
   lastModified: true // Enable Last-Modified header
 }));
+
+// Apply error handling middleware - must be after all routes
+app.use(errorHandler);
 
 // Start the server
 const PORT = config.PORT; // Using port from config (3001 by default)
