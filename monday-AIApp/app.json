@@ -1,0 +1,165 @@
+{
+  "app_id": "monday-claude-integration",
+  "version": "1.0.0",
+  "name": "Claude AI Assistant",
+  "description": "Integrate Claude AI into your Monday.com workspace to automate tasks, analyze data, and enhance productivity through natural language interactions.",
+  "long_description": "The Claude AI Assistant for Monday.com brings the power of Anthropic's Claude AI to your workspace, allowing you to interact with your boards, items, and data using natural language. Ask questions, create and update items, analyze data, and automate workflows - all through simple conversations with Claude.\n\nKey features:\n- Natural language interface for Monday.com operations\n- Document analysis and summarization\n- Workflow automation assistance\n- Data analysis and visualization recommendations\n- Contextual help and guidance\n\nThis integration securely connects your Monday.com account with Claude AI, ensuring your data remains protected while providing powerful AI capabilities to enhance your productivity.",
+  "icon_url": "https://example.com/claude-monday-icon.png",
+  "screenshots": [
+    {
+      "url": "https://example.com/screenshots/claude-monday-screenshot1.png",
+      "description": "Ask Claude to create new items using natural language"
+    },
+    {
+      "url": "https://example.com/screenshots/claude-monday-screenshot2.png",
+      "description": "Analyze documents and extract key information"
+    },
+    {
+      "url": "https://example.com/screenshots/claude-monday-screenshot3.png",
+      "description": "Get insights from your Monday.com data"
+    }
+  ],
+  "video_url": "https://example.com/claude-monday-demo.mp4",
+  "author": {
+    "name": "Claude Integration Team",
+    "email": "support@example.com",
+    "url": "https://example.com"
+  },
+  "categories": [
+    "productivity",
+    "ai-assistant",
+    "workflow-automation",
+    "data-analysis"
+  ],
+  "permissions": {
+    "oauth": {
+      "client_id": "${MONDAY_CLIENT_ID}",
+      "client_secret": "${MONDAY_CLIENT_SECRET}",
+      "redirect_uri": "${OAUTH_REDIRECT_URI}",
+      "scopes": [
+        "boards:read",
+        "boards:write",
+        "workspaces:read",
+        "users:read",
+        "account:read",
+        "notifications:write",
+        "automations:read",
+        "automations:write"
+      ]
+    }
+  },
+  "required_board_scopes": [
+    "read_items",
+    "write_items",
+    "read_columns",
+    "write_columns",
+    "read_groups",
+    "write_groups"
+  ],
+  "features": {
+    "monday_ai_assistant": {
+      "enabled": true,
+      "description": "Use Claude AI to interact with your Monday.com workspace"
+    },
+    "document_processing": {
+      "enabled": true,
+      "description": "Analyze, summarize, and extract information from documents"
+    },
+    "workflow_automation": {
+      "enabled": true,
+      "description": "Create and optimize automations with AI assistance"
+    },
+    "data_analysis": {
+      "enabled": true,
+      "description": "Get insights and visualizations from your Monday.com data"
+    }
+  },
+  "monetization": {
+    "pricing_model": "subscription",
+    "subscription_plans": [
+      {
+        "name": "Basic",
+        "price": 9.99,
+        "period": "monthly",
+        "features": [
+          "100 AI requests per month",
+          "Document processing up to 5 pages",
+          "Basic workflow automation"
+        ]
+      },
+      {
+        "name": "Pro",
+        "price": 29.99,
+        "period": "monthly",
+        "features": [
+          "1,000 AI requests per month",
+          "Document processing up to 20 pages",
+          "Advanced workflow automation",
+          "Data analysis and visualization"
+        ]
+      },
+      {
+        "name": "Enterprise",
+        "price": 99.99,
+        "period": "monthly",
+        "features": [
+          "10,000 AI requests per month",
+          "Unlimited document processing",
+          "Custom workflow templates",
+          "Advanced data analysis",
+          "Priority support"
+        ]
+      }
+    ],
+    "trial": {
+      "days": 14,
+      "features": [
+        "50 AI requests",
+        "Document processing up to 3 pages",
+        "Basic workflow automation"
+      ]
+    }
+  },
+  "installation": {
+    "steps": [
+      {
+        "title": "Authorize the app",
+        "description": "Click the 'Authorize' button to connect Claude AI to your Monday.com account"
+      },
+      {
+        "title": "Choose a subscription plan",
+        "description": "Select the plan that best fits your needs"
+      },
+      {
+        "title": "Start using Claude AI",
+        "description": "Open the Claude AI panel from any board to start interacting with your data"
+      }
+    ]
+  },
+  "support": {
+    "email": "support@example.com",
+    "url": "https://example.com/support",
+    "docs_url": "https://example.com/docs"
+  },
+  "privacy_policy_url": "https://example.com/privacy",
+  "terms_of_service_url": "https://example.com/terms",
+  "build": {
+    "client": {
+      "source_dir": "client/build",
+      "entry_file": "index.html"
+    },
+    "server": {
+      "source_dir": ".",
+      "entry_file": "index.js",
+      "exclude": [
+        "client",
+        "node_modules",
+        "tests",
+        "*.test.js",
+        "*.md",
+        ".git",
+        ".github"
+      ]
+    }
+  }
+}
