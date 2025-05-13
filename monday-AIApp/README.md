@@ -165,12 +165,13 @@ Before submitting to the Monday.com marketplace:
 
 ## Additional Documentation
 
-For detailed setup guides, please refer to the documentation in the `docs` directory:
+For detailed setup guides, please refer to the following resources:
 
-- [GitHub Secrets Setup](docs/GITHUB_SECRETS_SETUP.md) - How to securely store credentials for CI/CD pipelines
-- [Prometheus Setup](docs/PROMETHEUS_SETUP.md) - How to configure Prometheus to monitor your application
-- [Redis Setup](docs/REDIS_SETUP.md) - How to set up Redis for distributed caching
-- [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Solutions for common issues
+1. **[Security Configuration](docs/SECURITY_CONFIGURATION.md)** - How to configure security features and best practices
+2. **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)** - Solutions for common issues
+3. **[GitHub Secrets Setup](docs/GITHUB_SECRETS_SETUP.md)** - How to securely store credentials for CI/CD pipelines
+4. **[Prometheus Setup](docs/PROMETHEUS_SETUP.md)** - How to configure Prometheus to monitor your application
+5. **[Redis Setup](docs/REDIS_SETUP.md)** - How to set up Redis for distributed caching
 
 ## License
 
