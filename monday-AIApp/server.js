@@ -7,7 +7,6 @@ const config = require('./config');
 
 const express = require('express');
 const bodyParser = require('body-parser');
-const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const { v4: uuidv4 } = require('uuid');
@@ -19,32 +18,31 @@ const storage = new Storage();
 const logger = new Logger('monday-claude-integration');
 
 /**
- * Verify all required environment variables are present
+ * Verify all required environment variables are present and valid
  * This is a critical security check that runs at startup
  */
-function verifyEnvironmentVariables() {
-  const requiredVars = [
-    'MONDAY_CLIENT_ID',
-    'MONDAY_CLIENT_SECRET',
-    'OAUTH_REDIRECT_URI',
-    'MONDAY_API_TOKEN',
-    'CLAUDE_API_KEY',
-    'REGION'
-  ];
-
-  const missing = requiredVars.filter(varName => !process.env[varName]);
-
-  if (missing.length > 0) {
-    logger.error('ERROR: Missing required environment variables: ' + missing.join(', '));
-    logger.error('Please check your .env file and restart the application.');
-    process.exit(1);
-  }
-
-  logger.info('Environment validation successful - all required variables present');
-}
+const { validateEnvironment } = require('./utils/env-validator');
 
 // Verify environment variables before proceeding
-verifyEnvironmentVariables();
+const envValidation = validateEnvironment();
+
+if (!envValidation.valid) {
+  logger.error('ERROR: Environment validation failed');
+  logger.error('Please fix the following issues and restart the application:');
+
+  envValidation.errors.forEach(error => {
+    logger.error(`- ${error}`);
+  });
+
+  if (envValidation.warnings.length > 0) {
+    logger.warn('The following warnings were also found:');
+    envValidation.warnings.forEach(warning => {
+      logger.warn(`- ${warning}`);
+    });
+  }
+
+  process.exit(1);
+}
 
 // Import route handlers
 const monetizationRoutes = require('./monetization-routes');
@@ -88,12 +86,25 @@ app.use(compression({
   level: 6
 }));
 
-// Security middleware
-app.use(helmet());
+// Import security middleware
+const {
+  securityHeaders,
+  preventClickjacking,
+  apiSecurityHeaders,
+  validateRequestParams
+} = require('./middleware/securityMiddleware');
+
+// Apply security middleware
+app.use(securityHeaders());
+app.use(preventClickjacking);
 app.use(bodyParser.json());
+app.use(validateRequestParams);
 
 // Apply metrics middleware
 app.use(metricsMiddleware);
+
+// Apply API security headers to all API routes
+app.use('/api', apiSecurityHeaders);
 
 // Configure rate limiting
 const apiLimiter = rateLimit({
