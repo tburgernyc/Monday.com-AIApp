@@ -1,12 +1,48 @@
 // server.js with enhanced security and error handling
+// Load environment variables from .env file
+require('dotenv').config();
+
+// Import the centralized config module
+const config = require('./config');
+
 const express = require('express');
 const bodyParser = require('body-parser');
-const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const { v4: uuidv4 } = require('uuid');
 const { validationResult, body } = require('express-validator');
-const { Storage, Logger, Environment } = require('@mondaycom/apps-sdk');
+const { Storage, Logger } = require('@mondaycom/apps-sdk');
+
+// Initialize monday's SDK components
+const storage = new Storage();
+const logger = new Logger('monday-claude-integration');
+
+/**
+ * Verify all required environment variables are present and valid
+ * This is a critical security check that runs at startup
+ */
+const { validateEnvironment } = require('./utils/env-validator');
+
+// Verify environment variables before proceeding
+const envValidation = validateEnvironment();
+
+if (!envValidation.valid) {
+  logger.error('ERROR: Environment validation failed');
+  logger.error('Please fix the following issues and restart the application:');
+
+  envValidation.errors.forEach(error => {
+    logger.error(`- ${error}`);
+  });
+
+  if (envValidation.warnings.length > 0) {
+    logger.warn('The following warnings were also found:');
+    envValidation.warnings.forEach(warning => {
+      logger.warn(`- ${warning}`);
+    });
+  }
+
+  process.exit(1);
+}
 
 // Import route handlers
 const monetizationRoutes = require('./monetization-routes');
@@ -18,12 +54,14 @@ const mondayAPI = require('./monday-claude-utils/mondayAPI');
 const automationUtils = require('./monday-claude-utils/automationUtils');
 const scopeValidator = require('./monday-claude-utils/scopeValidator');
 
-const app = express();
+// Import middleware
+const { errorHandler } = require('./middleware/errorMiddleware');
+const { requireAuthentication } = require('./middleware/authMiddleware');
+const { cacheMiddleware } = require('./middleware/cacheMiddleware');
+const redisCache = require('./monday-claude-utils/redis-cache');
+const { metricsMiddleware, getMetrics } = require('./monitoring/metrics');
 
-// Initialize monday's SDK components
-const storage = new Storage();
-const logger = new Logger('monday-claude-integration');
-const env = new Environment();
+const app = express();
 
 // Generate request IDs for tracking
 app.use((req, res, next) => {
@@ -48,9 +86,25 @@ app.use(compression({
   level: 6
 }));
 
-// Security middleware
-app.use(helmet());
+// Import security middleware
+const {
+  securityHeaders,
+  preventClickjacking,
+  apiSecurityHeaders,
+  validateRequestParams
+} = require('./middleware/securityMiddleware');
+
+// Apply security middleware
+app.use(securityHeaders());
+app.use(preventClickjacking);
 app.use(bodyParser.json());
+app.use(validateRequestParams);
+
+// Apply metrics middleware
+app.use(metricsMiddleware);
+
+// Apply API security headers to all API routes
+app.use('/api', apiSecurityHeaders);
 
 // Configure rate limiting
 const apiLimiter = rateLimit({
@@ -66,10 +120,10 @@ const apiLimiter = rateLimit({
 // Apply rate limiting to API endpoints
 app.use('/api/', apiLimiter);
 
-// Load environment variables
-const CLAUDE_API_KEY = env.get('CLAUDE_API_KEY');
-const MONDAY_API_TOKEN = env.get('MONDAY_API_TOKEN');
-const REGION = env.get('REGION') || 'US';
+// Load environment variables from config
+const CLAUDE_API_KEY = config.CLAUDE_API_KEY;
+const MONDAY_API_TOKEN = config.MONDAY_API_TOKEN;
+const REGION = config.REGION;
 
 // Region-specific API endpoints
 const regionConfig = {
@@ -91,13 +145,38 @@ const CLAUDE_API_URL = regionConfig.CLAUDE_API_URL;
 
 // Mount route handlers
 app.use('/', oauthRoutes);
-app.use('/api', monetizationRoutes);
+app.use('/api', monetizationRoutes.router);
 
 /**
- * Health check endpoint
+ * Enhanced health check endpoint
  */
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok', region: REGION });
+app.get('/health', async (req, res) => {
+  try {
+    const healthCheck = require('./health-check-utils');
+
+    // Check Monday.com API connection
+    const mondayStatus = await healthCheck.checkMondayAPIConnection();
+
+    // Check Claude API connection
+    const claudeStatus = await healthCheck.checkClaudeAPIConnection();
+
+    res.status(200).json({
+      status: 'ok',
+      region: config.REGION,
+      environment: process.env.NODE_ENV || 'development',
+      services: {
+        monday: mondayStatus,
+        claude: claudeStatus
+      },
+      uptime: process.uptime()
+    });
+  } catch (error) {
+    logger.error('Health check failed', { error });
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
 });
 
 /**
@@ -108,7 +187,7 @@ app.post('/webhook/challenge', (req, res) => {
   if (req.body.challenge) {
     return res.json({ challenge: req.body.challenge });
   }
-  
+
   res.status(400).json({ error: 'Invalid webhook payload' });
 });
 
@@ -129,64 +208,64 @@ app.post('/api/process-request', [
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ 
-        error: 'Invalid request data', 
-        details: errors.array() 
+      return res.status(400).json({
+        error: 'Invalid request data',
+        details: errors.array()
       });
     }
-    
+
     const { userPrompt, userId, accountId, boardId } = req.body;
-    
+
     // Track request in logs
-    logger.info('Processing request', { 
+    logger.info('Processing request', {
       requestId: req.id,
       userId,
       accountId,
       boardId,
       promptLength: userPrompt.length
     });
-    
+
     // Store the request in storage for logging/history
     await storage.set(`user_${userId}_request_${Date.now()}`, {
       prompt: userPrompt,
       timestamp: new Date().toISOString(),
       requestId: req.id
     });
-    
+
     // Process the request with Claude
     const claudeResponse = await claudeAPI.processMondayRequest(userPrompt);
-    
+
     // Check if Claude generated a tool call
-    if (claudeResponse.content && 
-        claudeResponse.tool_calls && 
+    if (claudeResponse.content &&
+        claudeResponse.tool_calls &&
         claudeResponse.tool_calls.length > 0) {
-      
+
       const toolCall = claudeResponse.tool_calls[0];
-      
+
       if (toolCall.name === 'monday_action' && toolCall.input) {
         const { operation_type, graphql_string, variables } = toolCall.input;
-        
-        logger.info('Executing Monday.com operation', { 
+
+        logger.info('Executing Monday.com operation', {
           requestId: req.id,
           operationType: operation_type,
           variables: Object.keys(variables || {})
         });
-        
+
         // Execute the monday.com operation
         const mondayResult = await mondayAPI.executeGraphQL(
           graphql_string,
           variables
         );
-        
+
         // Generate explanation of the result
         const explanation = await claudeAPI.explainMondayResult(
           userPrompt,
           mondayResult
         );
-        
+
         // Generate a unique ID for this conversation
         const conversationId = uuidv4();
-        
+
         // Save conversation to history
         await claudeAPI.saveConversationHistory(userId, accountId, {
           id: conversationId,
@@ -200,7 +279,7 @@ app.post('/api/process-request', [
           explanation,
           timestamp: new Date().toISOString()
         });
-        
+
         return res.json({
           requestId: req.id,
           conversationId,
@@ -214,21 +293,21 @@ app.post('/api/process-request', [
         });
       }
     }
-    
+
     // If Claude didn't generate a tool call, return a helpful message
     logger.warn('Claude did not generate a tool call', { requestId: req.id });
-    
+
     return res.json({
       requestId: req.id,
       message: "I couldn't understand how to convert your request into a Monday.com action. Please try rephrasing with more specific details about what you'd like to do.",
       resolution: "Try mentioning specific boards, items, or actions you want to perform."
     });
-    
+
   } catch (error) {
     const errorId = uuidv4();
-    
+
     // Log detailed error information
-    logger.error('Error processing request', { 
+    logger.error('Error processing request', {
       errorId,
       requestId: req.id,
       error: {
@@ -241,33 +320,33 @@ app.post('/api/process-request', [
         data: error.response?.data
       }
     });
-    
+
     // Return appropriate error response based on type
     if (error.response) {
       // API error response
       if (error.response.status === 429) {
-        return res.status(429).json({ 
+        return res.status(429).json({
           error: 'Rate limit exceeded',
           message: 'The service is experiencing high demand. Please try again later.',
           errorId
         });
       } else if (error.response.status >= 500) {
-        return res.status(502).json({ 
+        return res.status(502).json({
           error: 'External service error',
           message: 'There was an issue communicating with our services. Please try again later.',
           errorId
         });
       }
     } else if (error.code === 'ECONNREFUSED' || error.code === 'ECONNRESET') {
-      return res.status(503).json({ 
+      return res.status(503).json({
         error: 'Service unavailable',
         message: 'Unable to connect to required services. Please try again later.',
         errorId
       });
     }
-    
+
     // Generic error for other cases
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: 'Processing error',
       message: 'An unexpected error occurred while processing your request. Our team has been notified.',
       errorId
@@ -293,14 +372,14 @@ app.post('/api/process-document', [
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ 
-        error: 'Invalid request data', 
-        details: errors.array() 
+      return res.status(400).json({
+        error: 'Invalid request data',
+        details: errors.array()
       });
     }
-    
+
     const { document, action, userId, accountId } = req.body;
-    
+
     // Map actions to prompts
     const actionPrompts = {
       'summarize': `Please provide a concise summary of the following document:\n\n${document}`,
@@ -309,16 +388,16 @@ app.post('/api/process-document', [
       'extract_action_items': `Please identify all action items or tasks mentioned in the following document:\n\n${document}`,
       'simplify': `Please rewrite the following document in simpler, more accessible language while preserving all key information:\n\n${document}`
     };
-    
+
     // Get the appropriate prompt
     const prompt = actionPrompts[action];
-    
+
     // Process with Claude
     const claudeResponse = await claudeAPI.sendMessage({
       prompt: prompt,
       maxTokens: 1500
     });
-    
+
     // Extract the content from Claude's response
     let result = '';
     if (claudeResponse.content && claudeResponse.content.length > 0) {
@@ -326,17 +405,17 @@ app.post('/api/process-document', [
     } else {
       result = "Could not process the document. Please try again with a clearer document.";
     }
-    
+
     return res.json({
       result,
       action
     });
-    
+
   } catch (error) {
     const errorId = uuidv4();
-    
+
     // Log detailed error information
-    logger.error('Error processing document', { 
+    logger.error('Error processing document', {
       errorId,
       requestId: req.id,
       error: {
@@ -344,9 +423,9 @@ app.post('/api/process-document', [
         stack: error.stack
       }
     });
-    
+
     // Return appropriate error response
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: 'Processing error',
       message: 'An unexpected error occurred while processing your document.',
       errorId
@@ -365,14 +444,14 @@ app.post('/api/test-automation', [
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ 
-        error: 'Invalid request data', 
-        details: errors.array() 
+      return res.status(400).json({
+        error: 'Invalid request data',
+        details: errors.array()
       });
     }
-    
+
     const { automation } = req.body;
-    
+
     // Validate automation structure
     const validationResult = automationUtils.validateAutomationConfiguration(automation);
     if (!validationResult.isValid) {
@@ -381,13 +460,13 @@ app.post('/api/test-automation', [
         details: validationResult.errors
       });
     }
-    
+
     // Generate optimization suggestions
     const suggestions = automationUtils.generateOptimizationSuggestions(automation);
-    
+
     // Check for required permissions
     const requiredScopes = [['automations', 'create']];
-    
+
     // Return success with any suggestions
     return res.json({
       result: 'success',
@@ -398,12 +477,12 @@ app.post('/api/test-automation', [
         message: 'Creating automations requires the automations:create permission'
       }
     });
-    
+
   } catch (error) {
     const errorId = uuidv4();
     logger.error('Error testing automation', { errorId, error });
-    
-    return res.status(500).json({ 
+
+    return res.status(500).json({
       error: 'Failed to test automation',
       errorId
     });
@@ -413,11 +492,14 @@ app.post('/api/test-automation', [
 /**
  * Get workflow templates endpoint
  */
-app.get('/api/workflow-templates', (req, res) => {
+app.get('/api/workflow-templates', cacheMiddleware({
+  prefix: 'workflow-templates',
+  ttl: 3600 // Cache for 1 hour
+}), (req, res) => {
   try {
     const workflowTemplates = require('./monday-claude-utils/workflowTemplates');
     const templates = workflowTemplates.getAvailableTemplateNames();
-    
+
     return res.json({
       templates
     });
@@ -430,16 +512,19 @@ app.get('/api/workflow-templates', (req, res) => {
 /**
  * Get specific workflow template
  */
-app.get('/api/workflow-templates/:templateName', (req, res) => {
+app.get('/api/workflow-templates/:templateName', cacheMiddleware({
+  prefix: 'workflow-template',
+  ttl: 3600 // Cache for 1 hour
+}), (req, res) => {
   try {
     const { templateName } = req.params;
     const workflowTemplates = require('./monday-claude-utils/workflowTemplates');
     const template = workflowTemplates.getWorkflowTemplate(templateName);
-    
+
     if (!template) {
       return res.status(404).json({ error: 'Template not found' });
     }
-    
+
     return res.json({
       template
     });
@@ -452,59 +537,42 @@ app.get('/api/workflow-templates/:templateName', (req, res) => {
 /**
  * Get conversation history for a user
  */
-app.get('/api/conversation-history/:userId', async (req, res) => {
+app.get('/api/conversation-history/:userId', requireAuthentication, cacheMiddleware({
+  prefix: 'conversation-history',
+  ttl: 60 // Cache for 1 minute (short TTL since this data changes frequently)
+}), async (req, res, next) => {
   try {
     const { userId } = req.params;
-    
-    // Validate session token
-    const sessionToken = req.headers['x-monday-session-token'];
-    if (!sessionToken) {
-      return res.status(401).json({ error: 'Missing session token' });
-    }
-    
+
     // Get conversation history
     const history = await claudeAPI.getConversationHistory(userId);
-    
+
     return res.json(history);
   } catch (error) {
-    logger.error('Error getting conversation history', { 
-      error, 
-      userId: req.params.userId 
-    });
-    
-    return res.status(500).json({ 
-      error: 'Failed to retrieve conversation history' 
-    });
+    // Pass error to the error handling middleware
+    next(error);
   }
 });
 
 /**
  * Clear conversation history for a user
  */
-app.delete('/api/conversation-history/:userId', async (req, res) => {
+app.delete('/api/conversation-history/:userId', requireAuthentication, async (req, res, next) => {
   try {
     const { userId } = req.params;
-    
-    // Validate session token
-    const sessionToken = req.headers['x-monday-session-token'];
-    if (!sessionToken) {
-      return res.status(401).json({ error: 'Missing session token' });
-    }
-    
+
     // Clear history (set empty array)
     const historyKey = `conversation_history_${userId}`;
     await storage.set(historyKey, []);
-    
+
+    // Invalidate cache for this user's conversation history
+    const { invalidateCache } = require('./middleware/cacheMiddleware');
+    await invalidateCache(`conversation-history:${userId}`);
+
     return res.json({ success: true });
   } catch (error) {
-    logger.error('Error clearing conversation history', { 
-      error, 
-      userId: req.params.userId 
-    });
-    
-    return res.status(500).json({ 
-      error: 'Failed to clear conversation history' 
-    });
+    // Pass error to the error handling middleware
+    next(error);
   }
 });
 
@@ -515,13 +583,43 @@ app.use(express.static('client/build', {
   lastModified: true // Enable Last-Modified header
 }));
 
+/**
+ * Metrics endpoint for Prometheus
+ */
+app.get('/metrics', async (req, res) => {
+  try {
+    const metrics = await getMetrics();
+    res.set('Content-Type', 'text/plain');
+    res.send(metrics);
+  } catch (error) {
+    logger.error('Error generating metrics', { error });
+    res.status(500).send('Error generating metrics');
+  }
+});
+
+// Apply error handling middleware - must be after all routes
+app.use(errorHandler);
+
 // Start the server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+const PORT = config.PORT; // Using port from config (3001 by default)
+const server = app.listen(PORT, () => {
   logger.info(`Server running on port ${PORT} in ${REGION} region`);
 });
 
-// Export for testing
-module.exports = {
-  app
-};
+// Add graceful shutdown handling
+process.on('SIGTERM', () => {
+  console.log('SIGTERM signal received: closing HTTP server');
+  server.close(() => {
+    console.log('HTTP server closed');
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT signal received: closing HTTP server');
+  server.close(() => {
+    console.log('HTTP server closed');
+  });
+});
+
+// Export the app and server for testing
+module.exports = { app, server };

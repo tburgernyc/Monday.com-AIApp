@@ -1,115 +1,183 @@
 # Monday.com Claude Integration App
 
-A powerful integration that enables monday.com users to manage their boards, items, subitems, automations, and workflows using natural language through Claude's AI capabilities.
+A secure cloud-based integration that enables natural language processing for Monday.com workflows using Claude AI.
 
 ## Features
 
-- **Natural Language Interface**: Use plain English to create, update, and manage monday.com entities
-- **Comprehensive Management**: Support for boards, items, subitems, columns, groups, and more
-- **Intelligent Responses**: Clear explanations of actions performed and results
-- **Seamless Integration**: Works as a native monday.com app feature
+- Natural language processing for Monday.com tasks
+- Document analysis and summarization
+- Workflow automation through conversational interface
+- Secure OAuth authentication with Monday.com
+- Usage tracking and subscription management
 
-## Architecture
+## Getting Started
 
-The app consists of:
+### Prerequisites
 
-1. **Backend Server (Node.js)**: Handles API requests, authentication, and business logic
-2. **Frontend Component (React.js)**: Provides user interface within monday.com
-3. **Claude API Integration**: Processes natural language and generates structured operations
-4. **Monday.com GraphQL API**: Executes operations on the monday.com platform
+- Node.js 16.x or higher
+- npm or yarn package manager
+- Monday.com account with admin privileges
+- Claude API key from Anthropic
 
-## Prerequisites
+### Installation
 
-Before you begin, ensure you have:
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/monday-claude-integration.git
+   cd monday-claude-integration
+   ```
 
-- A monday.com account with developer permissions
-- An API token for the Anthropic Claude API
-- Node.js (v16 or higher) and npm installed
-- The monday.com Apps CLI installed globally (`npm install -g @mondaycom/apps-cli`)
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-## Setup and Installation
+3. Set up environment variables:
+   - Copy `.env.example` to `.env`
+   ```bash
+   cp .env.example .env
+   ```
+   - Edit `.env` and fill in your credentials:
+     - `MONDAY_CLIENT_ID`: Your Monday.com OAuth client ID
+     - `MONDAY_CLIENT_SECRET`: Your Monday.com OAuth client secret
+     - `MONDAY_API_TOKEN`: Your Monday.com API token
+     - `CLAUDE_API_KEY`: Your Claude API key from Anthropic
+     - `REGION`: Your Monday.com region (US or EU)
 
-### 1. Clone the repository
+4. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+### Environment Variables
+
+The application requires several environment variables to be set. Copy the `.env.example` file to `.env` and fill in your values:
+
+```
+# Monday.com OAuth credentials
+MONDAY_CLIENT_ID=your_monday_client_id_here
+MONDAY_CLIENT_SECRET=your_monday_client_secret_here
+OAUTH_REDIRECT_URI=http://localhost:3000/oauth/callback
+
+# Monday.com API token (for SDK authentication)
+MONDAY_API_TOKEN=your_monday_api_token_here
+
+# Claude AI API key (for AI assistant)
+CLAUDE_API_KEY=your_claude_api_key_here
+
+# Region for API endpoints (US or EU)
+REGION=US
+
+# Server port (default: 3001)
+PORT=3001
+```
+
+## Usage
+
+### Authentication
+
+The app uses OAuth 2.0 for authentication with Monday.com. Users will be redirected to Monday.com to authorize the app, and then redirected back to the app with an authorization code.
+
+### API Endpoints
+
+- `/api/process-request`: Process a natural language request
+- `/api/conversation-history`: Get conversation history
+- `/api/document-process`: Process a document
+- `/api/subscription/status`: Get subscription status
+- `/api/usage`: Get usage statistics
+
+## Development
+
+### Project Structure
+
+```
+monday-claude-integration/
+├── client/                 # Frontend code
+├── monday-claude-utils/    # Utility functions
+│   ├── enhanced-claudeAPI.js  # Claude API integration
+│   ├── mondayAPI.js        # Monday.com API integration
+│   └── ...
+├── tests/                  # Test files
+├── server.js               # Main server file
+├── config.js               # Configuration
+└── ...
+```
+
+### Testing
+
+Run tests with:
 
 ```bash
-git clone https://github.com/your-username/monday-claude-integration.git
-bashnpm install
-cd monday-claude-integratio2. Install server dependencies
-3. Install client dependencies
-bashcd client
-npm install
-cd ..
-4. Configure environment variables
-Copy the .env.template file to .env and fill in your API credentials:
-bashcp .env.template .env
-Edit the .env file with your monday.com API token and Claude API key.
-5. Initialize monday apps CLI
-bashmapps init
-Follow the prompts to connect to your monday.com account.
-6. Create the app in monday.com
+npm test
+```
 
-Go to your monday.com account
-Navigate to the Developer Center (click your profile photo → Developers)
-Click "Create App"
-Fill in the app details
-Note the App ID and update it in your .env file
+## Deployment
 
-Development
-Local development
-Run the backend and frontend concurrently:
-bashnpm run dev-concurrent
-Or run them separately:
-bash# Backend only
-npm run dev
+### Production Build
 
-# Frontend only
-npm run client
-Building for production
-bash# Build the client
-npm run client-build
+Create a production build with:
 
-# Deploy to monday code
-npm run deploy
-Usage
-Once deployed, you can access the Claude AI Assistant in two ways:
+```bash
+npm run build
+```
 
-Board View: Add it as a view to any monday.com board
-AI Assistant: Use it from the board header by clicking the AI Assistant button
+### Deployment to Monday.com Marketplace
 
-Example prompts
+Before submitting to the Monday.com marketplace:
 
-"Create a new board called Q1 Marketing Campaign"
-"Add an item called Website Redesign to the Marketing Projects board with a status of In Progress"
-"Show me all items with status Stuck"
-"Create a subitem called Design Homepage under the Website Redesign item"
-"Move the Website Redesign item to the Done group"
-"Change the status of all items assigned to John to Done"
+1. Ensure all tests pass
+2. Validate the app locally
+3. Test the deployment
+4. Review security considerations
+5. Prepare documentation
 
-Permissions
-This app requires the following permissions:
+## Security Considerations
 
-Read/write access to boards
-Read/write access to items
-Read/write access to columns
-Read access to users
-Read access to account information
+### API Key Security
+- **NEVER commit API keys or secrets to version control**
+- Store all credentials in environment variables
+- Use `.env.example` with placeholders to document required variables
+- Rotate any credentials that may have been exposed
 
-Troubleshooting
-Common issues
+### Authentication and Authorization
+- OAuth flow is used for secure authentication with Monday.com
+- Session tokens are validated on all protected endpoints
+- Permission checks are performed for sensitive operations
+- HTTPS is required for all communications
 
-Authorization errors: Ensure your monday.com API token has the correct permissions
-Claude API errors: Verify your Claude API key is valid and has the right model access
-Deployment issues: Make sure you've initialized the monday apps CLI correctly
+### Rate Limiting and Protection
+- Rate limiting is implemented to prevent abuse
+- Exponential backoff with jitter for API retries
+- Request queuing for high-traffic scenarios
+- Input validation and sanitization on all endpoints
 
-Logs
-Check the logs for more detailed error information:
-bashmapps code:logs
-Contributing
-Contributions are welcome! Please feel free to submit a Pull Request.
-License
+### Monitoring and Logging
+- Structured logging with appropriate log levels
+- Performance metrics collection via Prometheus
+- Real-time monitoring for security events
+- Sensitive data is redacted from logs
+
+### Deployment Security
+- Use GitHub Secrets for CI/CD credentials
+- Separate environments for development, staging, and production
+- Security scanning in the CI pipeline
+- Regular dependency updates and vulnerability scanning
+
+## Additional Documentation
+
+For detailed setup guides, please refer to the following resources:
+
+1. **GitHub Secrets Setup** - How to securely store credentials for CI/CD pipelines
+2. **Prometheus Monitoring** - How to configure Prometheus to monitor your application
+3. **Redis for Production** - How to set up Redis for distributed caching
+4. **Troubleshooting Guide** - Solutions for common issues
+
+## License
+
 This project is licensed under the MIT License - see the LICENSE file for details.
-Acknowledgments
 
-monday.com Apps Framework
-Claude API Documentation
-monday.com GraphQL APIn
+## Acknowledgements
+
+- [Monday.com](https://monday.com) for their excellent API
+- [Anthropic](https://anthropic.com) for Claude AI
+- All contributors to this project
