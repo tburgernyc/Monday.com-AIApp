@@ -13,6 +13,8 @@
     "test:health": "jest tests/health.test.js --detectOpenHandles --forceExit",
     "test:ci": "jest --forceExit",
     "test:watch": "jest --watch",
+    "generate-keys": "node scripts/generate-keys.js",
+    "setup": "npm install && npm run generate-keys",
     "mapps:init": "mapps init",
     "mapps:login": "mapps login",
     "mapps:deploy:client": "npm run client-build && mapps deploy client",

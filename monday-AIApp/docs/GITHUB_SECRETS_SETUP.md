@@ -17,19 +17,19 @@ For the Monday.com Claude Integration App, you need to set up the following secr
 ### Test Environment
 
 ```
-MONDAY_CLIENT_ID_TEST=your_monday_client_id_here
-MONDAY_CLIENT_SECRET_TEST=your_monday_client_secret_here
-MONDAY_API_TOKEN_TEST=your_monday_api_token_here
-CLAUDE_API_KEY_TEST=your_claude_api_key_here
+MONDAY_CLIENT_ID_TEST=********
+MONDAY_CLIENT_SECRET_TEST=********
+MONDAY_API_TOKEN_TEST=********
+# Store your Claude API key in GitHub Secrets, not in code or docs
 ```
 
 ### Staging Environment
 
 ```
-MONDAY_CLIENT_ID_STAGING=your_monday_client_id_here
-MONDAY_CLIENT_SECRET_STAGING=your_monday_client_secret_here
-MONDAY_API_TOKEN_STAGING=your_monday_api_token_here
-CLAUDE_API_KEY_STAGING=your_claude_api_key_here
+MONDAY_CLIENT_ID_STAGING=********
+MONDAY_CLIENT_SECRET_STAGING=********
+MONDAY_API_TOKEN_STAGING=********
+# Store your Claude API key in GitHub Secrets, not in code or docs
 REDIS_URL_STAGING=redis://username:password@your-redis-host:6379
 REGION_STAGING=US
 ```
@@ -37,10 +37,10 @@ REGION_STAGING=US
 ### Production Environment
 
 ```
-MONDAY_CLIENT_ID_PROD=your_monday_client_id_here
-MONDAY_CLIENT_SECRET_PROD=your_monday_client_secret_here
-MONDAY_API_TOKEN_PROD=your_monday_api_token_here
-CLAUDE_API_KEY_PROD=your_claude_api_key_here
+MONDAY_CLIENT_ID_PROD=********
+MONDAY_CLIENT_SECRET_PROD=********
+MONDAY_API_TOKEN_PROD=********
+# Store your Claude API key in GitHub Secrets, not in code or docs
 REDIS_URL_PROD=redis://username:password@your-redis-host:6379
 REGION_PROD=US
 ```
